@@ -62,16 +62,18 @@ mnist_dataloader = MnistDataloader(training_images_filepath, training_labels_fil
 
 (x_train, y_train), (x_test, y_test) = mnist_dataloader.load_data()
 
-#   image    neurons & neurons  output
-# (28 * 28) -> 16   ->   16   ->  10
-layer0W = np.random.rand(28 * 28, 16)
-layer0b = np.random.rand(28 * 28)
-
-layer1W = np.random.rand(16, 16)
-layer1b = np.random.rand(16)
-
-layer2W = np.random.rand(10, 16)
-layer2b = np.random.rand(10)
+class Layer:
+    def __init__(self, input_count, output_count):
+        # There are the inputs which are the outputs of the previous layer's neruons
+        # and then you have this layer's outputs which are the result of the weight
+        # multiplication and added bias
+        self.input_count = input_count
+        self.output_count = output_count
+        self.weights = np.random.rand(output_count, input_count)
+        self.bias = np.random.rand(output_count)
+    
+    def feedforward(self, inputs):
+        return np.tanh(np.dot(inputs, self.weights) + self.bias)
 
 
 
