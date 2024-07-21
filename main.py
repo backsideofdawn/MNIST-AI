@@ -72,8 +72,35 @@ class Layer:
         self.weights = np.random.rand(output_count, input_count)
         self.bias = np.random.rand(output_count)
     
-    def feedforward(self, inputs):
-        return np.tanh(np.dot(inputs, self.weights) + self.bias)
+    def feed_forward(self, inputs, activation):
+        # If the number of inputs doesn't match the expected input count
+        if len(inputs) != self.input_count:
+            raise ValueError(f'Expected inputs of size {self.input_count}. Got {len(inputs)}')
+        
+        output = np.dot(inputs, self.weights) + self.bias
 
-
-
+        if activation == 'relu':
+            # Same as np.maximum(output, 0), but much faster
+            output[output < 0] = 0
+            return output
+        elif activation == 'tanh':
+            return np.tanh(output)
+        elif activation == 'softmax':
+            np.exp
+        elif activation == 'linear':
+            return output
+        else:
+            raise ValueError(f'Unknown activation type {activation}. Accepted values are "relu", "tanh", and "linear"')
+class Network:
+    def __init__(self, *neuronCounts):
+        self.neuronCounts = neuronCounts
+        self.layers = []
+        for i in range(len(neuronCounts) - 1):
+            newLayer = Layer(neuronCounts[i], neuronCounts[i + 1])
+            self.layers.append(newLayer)
+    
+    def feed_forward(self, inputs):
+        # If the number of inputs doesn't match the size of the first layer
+        if len(inputs) != self.layers[0].input_count:
+            raise ValueError(f'Expected inputs of size {self.layers[0].input_count}. Got {len(inputs)}')
+        
