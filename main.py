@@ -63,7 +63,7 @@ mnist_dataloader = MnistDataloader(training_images_filepath, training_labels_fil
 (x_train, y_train), (x_test, y_test) = mnist_dataloader.load_data()
 
 class Layer:
-    def __init__(self, input_count, output_count):
+    def __init__(self, input_count, output_count, activation='linear'):
         # There are the inputs which are the outputs of the previous layer's neruons
         # and then you have this layer's outputs which are the result of the weight
         # multiplication and added bias
@@ -71,36 +71,54 @@ class Layer:
         self.output_count = output_count
         self.weights = np.random.rand(output_count, input_count)
         self.bias = np.random.rand(output_count)
+        if not activation in ['relu', 'tanh', 'softmax', 'linear']:
+            raise ValueError(f"Unknown activation type {self.activation}. Accepted values are 'relu', 'tanh', 'softmax', and 'linear'")
+        self.activation = activation
     
-    def feed_forward(self, inputs, activation):
+    def feed_forward(self, inputs):
         # If the number of inputs doesn't match the expected input count
         if len(inputs) != self.input_count:
             raise ValueError(f'Expected inputs of size {self.input_count}. Got {len(inputs)}')
         
         output = np.dot(inputs, self.weights) + self.bias
 
-        if activation == 'relu':
+        if self.activation == 'relu':
             # Same as np.maximum(output, 0), but much faster
             output[output < 0] = 0
             return output
-        elif activation == 'tanh':
+        elif self.activation == 'tanh':
             return np.tanh(output)
-        elif activation == 'softmax':
-            np.exp
-        elif activation == 'linear':
+        elif self.activation == 'softmax':
+            exponents = np.exp(output)
+            return exponents / np.sum(exponents)
+        elif self.activation == 'linear':
             return output
-        else:
-            raise ValueError(f'Unknown activation type {activation}. Accepted values are "relu", "tanh", and "linear"')
+
 class Network:
     def __init__(self, *neuronCounts):
         self.neuronCounts = neuronCounts
         self.layers = []
-        for i in range(len(neuronCounts) - 1):
-            newLayer = Layer(neuronCounts[i], neuronCounts[i + 1])
+        # The activation type for each layer is declared in the initalization of the object                   
+        # The zip function makes a list of tuples given two lists, the shorter list being the length of the outputed list
+        # j is just i but +1 index further in neuron counts
+        for i, j in zip(neuronCounts, neuronCounts[1:]): 
+            # If this is the last layer
+            if j == neuronCounts[-1]:
+                activation = 'softmax'
+            else:
+                activation = 'relu'
+            
+            newLayer = Layer(i, j, activation)
             self.layers.append(newLayer)
     
     def feed_forward(self, inputs):
         # If the number of inputs doesn't match the size of the first layer
         if len(inputs) != self.layers[0].input_count:
             raise ValueError(f'Expected inputs of size {self.layers[0].input_count}. Got {len(inputs)}')
+        output = inputs
+        for i in range(len(self.neuronCounts)):
+            output = self.layers[i].feed_forward(output)
+        return output
         
+# Some pseudocode
+
