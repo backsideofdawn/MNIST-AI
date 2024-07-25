@@ -71,6 +71,7 @@ class Layer:
         self.output_count = output_count
         self.weights = np.random.rand(output_count, input_count)
         self.bias = np.random.rand(output_count)
+        self.output = None
         if not activation in ['relu', 'tanh', 'softmax', 'linear']:
             raise ValueError(f"Unknown activation type {self.activation}. Accepted values are 'relu', 'tanh', 'softmax', and 'linear'")
         self.activation = activation
@@ -80,24 +81,25 @@ class Layer:
         if len(inputs) != self.input_count:
             raise ValueError(f'Expected inputs of size {self.input_count}. Got {len(inputs)}')
         
-        output = np.dot(inputs, self.weights) + self.bias
+        self.output = np.dot(inputs, self.weights) + self.bias
 
         if self.activation == 'relu':
             # Same as np.maximum(output, 0), but much faster
-            output[output < 0] = 0
-            return output
+            self.output[self.output < 0] = 0
         elif self.activation == 'tanh':
-            return np.tanh(output)
+            self.output = np.tanh(self.output)
         elif self.activation == 'softmax':
-            exponents = np.exp(output)
-            return exponents / np.sum(exponents)
+            exponents = np.exp(self.output)
+            self.output = exponents / np.sum(exponents)
         elif self.activation == 'linear':
-            return output
-
+            pass
+        return self.output
+    
 class Network:
     def __init__(self, *neuronCounts):
         self.neuronCounts = neuronCounts
         self.layers = []
+        self.output = None
         # The activation type for each layer is declared in the initalization of the object                   
         # The zip function makes a list of tuples given two lists, the shorter list being the length of the outputed list
         # j is just i but +1 index further in neuron counts
@@ -115,10 +117,26 @@ class Network:
         # If the number of inputs doesn't match the size of the first layer
         if len(inputs) != self.layers[0].input_count:
             raise ValueError(f'Expected inputs of size {self.layers[0].input_count}. Got {len(inputs)}')
-        output = inputs
+        
+        self.output = inputs
         for i in range(len(self.neuronCounts)):
-            output = self.layers[i].feed_forward(output)
-        return output
+            # Feeds the last layers output into the next one's input, and stores the output in the output variable
+            self.output = self.layers[i].feed_forward(self.output)
+        return self.output
+    
+    def loss(self, output, example):
+        return np.sum((output - example) ** 2) / len(output)
+    
+    def back_propagate(self, example, learning_rate):
+        pass
         
 # Some pseudocode
+"""
+x1 = ReLU((input * W1) + b1)
+x2 = ReLU((x1 * W2) + b2)
+x3 = ReLU((x2 * W3) + b3)
+loss = (x3 - example)
 
+d(x3) = (((x2 * W3) + b3) > 0) * W3 * d(x2)
+d(x2) = (((x1 * W2) + b2) > 0) * W2 * d(x1)
+"""
