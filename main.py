@@ -63,17 +63,25 @@ mnist_dataloader = MnistDataloader(training_images_filepath, training_labels_fil
 (x_train, y_train), (x_test, y_test) = mnist_dataloader.load_data()
 
 class Layer:
-    def __init__(self, input_count, output_count, activation='linear'):
+    def __init__(self, input_count: int, output_count: int, activation='linear', next_layer=None):
         # There are the inputs which are the outputs of the previous layer's neruons
         # and then you have this layer's outputs which are the result of the weight
         # multiplication and added bias
         self.input_count = input_count
         self.output_count = output_count
+
         self.weights = np.random.rand(output_count, input_count)
+        self.weight_derivatives = np.zeros(output_count, input_count)
+
         self.bias = np.random.rand(output_count)
+        self.bias_derivatives = np.zeros(output_count)
+
         self.output = None
-        if not activation in ['relu', 'tanh', 'softmax', 'linear']:
-            raise ValueError(f"Unknown activation type {self.activation}. Accepted values are 'relu', 'tanh', 'softmax', and 'linear'")
+
+        self.next_layer = next_layer
+        accepted_activations = ['relu', 'tanh', 'softmax', 'linear']
+        if not activation in accepted_activations:
+            raise ValueError(f"Unknown activation type {self.activation}. Accepted values are {accepted_activations}")
         self.activation = activation
     
     def feed_forward(self, inputs):
@@ -95,23 +103,50 @@ class Layer:
             pass
         return self.output
     
+    def derivative_weighted_input_activation(self):
+        if self.activation == 'relu':
+            return np.array(self.output > 0, dtype=float)
+        if self.activation == 'linear':
+            return self.output
+        # TODO: Add more activation derivatives
+    
+    def error_last_layer(self, example):
+        # Loss derivative
+        if self.loss_type == 'squared error':
+            activation_loss_derivative = (2 * (self.output - example)) * (1 / len(self.output))
+    
+        return activation_loss_derivative * self.derivative_weighted_input_activation()
+    
+    def error_hidden_layer(self, next_layer_errors):
+        weighted_input_error_derivative = np.dot(np.transpose(self.next_layer.weights), next_layer_errors)
+        return weighted_input_error_derivative * self.derivative_weighted_input_activation()
+    
+
+    
 class Network:
-    def __init__(self, *neuronCounts):
-        self.neuronCounts = neuronCounts
+    def __init__(self, *neuron_counts, loss_type='squared error'):
+        self.neuronCounts = neuron_counts
+        accepted_loss_types = ['squared error']
+        if not loss_type in accepted_loss_types:
+            raise
+        self.loss_type = loss_type
         self.layers = []
+        # The output variable in this class is for the entire network
+        # whereas in the Layer class it's only for a single layer
         self.output = None
         # The activation type for each layer is declared in the initalization of the object                   
         # The zip function makes a list of tuples given two lists, the shorter list being the length of the outputed list
         # j is just i but +1 index further in neuron counts
-        for i, j in zip(neuronCounts, neuronCounts[1:]): 
+        for i, j in zip(neuron_counts, neuron_counts[1:]): 
             # If this is the last layer
-            if j == neuronCounts[-1]:
+            if j == neuron_counts[-1]:
                 activation = 'softmax'
             else:
                 activation = 'relu'
             
-            newLayer = Layer(i, j, activation)
-            self.layers.append(newLayer)
+            new_layer = Layer(i, j, activation)
+            self.layers.append(new_layer)
+            self.layers[-2].next_layer = new_layer
     
     def feed_forward(self, inputs):
         # If the number of inputs doesn't match the size of the first layer
@@ -125,10 +160,14 @@ class Network:
         return self.output
     
     def loss(self, output, example):
-        return np.sum((output - example) ** 2) / len(output)
+        if self.loss_type == 'squared error':
+            return np.sum((output - example) ** 2) / len(output)
     
     def back_propagate(self, example, learning_rate):
         pass
+
+
+        
         
 # Some pseudocode
 """
