@@ -3,6 +3,77 @@ import numpy as np # linear algebra
 import struct
 from array import array
 from os.path  import join
+from matplotlib import pyplot as plt
+
+class Network:
+    def __init__(self, *layer_sizes, loss='squared error', hidden_activation='relu', output_activation='softmax'):
+        self.layer_sizes = layer_sizes
+        self.layer_count = len(self.layer_sizes)
+
+        accepted_loss_types = ['squared error']
+        if not loss in accepted_loss_types:
+            raise ValueError(f"{loss} is not an accepted loss type. The accepted values are {accepted_loss_types}")
+        self.loss_type = loss
+
+        accepted_activation_types = ['relu', 'softmax']
+
+        if not hidden_activation in accepted_activation_types:
+            raise ValueError(f"{hidden_activation} is not an accepted hidden activation function. The accepted values are {accepted_activation_types}")
+        self.hidden_activation = hidden_activation
+
+        if not output_activation in accepted_activation_types:
+            raise ValueError(f"{output_activation} is not an accepted output activation function. The accepted values are {accepted_activation_types}")
+        self.output_activation = output_activation
+        
+        self.weights = []
+        self.weight_gradients = []
+
+        self.biases = []
+        self.bias_gradients = []
+
+        self.activations = [np.zeros(self.layer_sizes[0])] # The first index is the input to the network
+        self.errors = []
+        
+        for i in range(self.layer_count - 1):
+            self.weights.append(np.random.rand(self.layer_sizes[i + 1], self.layer_sizes[i]) * 2 - 1)
+            self.weight_gradients.append(np.zeros(self.weights[i].shape))
+
+            self.biases.append(np.zeros(self.layer_sizes[i + 1]))
+            self.bias_gradients.append(np.zeros(self.biases[i].shape))
+
+            self.activations.append(np.zeros(self.layer_sizes[i + 1]))
+            self.errors.append(np.zeros(self.layer_sizes[i + 1]))
+
+    def feed_forward(self, x):
+        # If the input shape doesn't match the size of the first layer
+        if len(x) != self.layer_sizes[0]:
+            raise ValueError(f'Expected inputs of size {self.layer_sizes[0]}. Got {len(x)}')
+        
+        self.activations[0] = x
+        # 1 is subtracted because the first 'layer' is just the input to the network and doesn't have any processing
+        for i in range(self.layer_count - 1):
+            z = self.weights[i] @ self.activations[i] + self.biases[i]
+            activation_type = self.output_activation if i == (self.layer_count - 2) else self.hidden_activation # If it's the last layer use the output activation type
+            if activation_type == 'relu':
+                activation = np.maximum(0, z)
+            elif activation_type == 'softmax':
+                exponents = np.exp(z - np.max(z))
+                activation = exponents / np.sum(exponents)
+            self.activations[i + 1] = activation
+        
+        return self.activations[-1]
+    
+    def back_propagate(self, x, learning_rate):
+        self.feed_forward(x)
+
+        errors = []
+        # Error from loss to last layer activation
+        if self.loss_type == 'squared error':
+            loss_grad = 2 * self.activations[-1]
+        
+        # Error from the last layer activation to z
+        if self.
+
 
 # Following region is from https://www.kaggle.com/code/hojjatk/read-mnist-dataset?scriptVersionId=9466282&cellId=1
 # region MnistDataLoader    
@@ -62,113 +133,19 @@ mnist_dataloader = MnistDataloader(training_images_filepath, training_labels_fil
 
 (x_train, y_train), (x_test, y_test) = mnist_dataloader.load_data()
 
-class Layer:
-    def __init__(self, input_count: int, output_count: int, activation='linear', next_layer=None):
-        # There are the inputs which are the outputs of the previous layer's neruons
-        # and then you have this layer's outputs which are the result of the weight
-        # multiplication and added bias
-        self.input_count = input_count
-        self.output_count = output_count
+x_train = [np.array(x).flatten() for x in x_train]
+y_train = [np.array(y).flatten() for y in y_train]
 
-        self.weights = np.random.rand(output_count, input_count)
-        self.weight_derivatives = np.zeros(output_count, input_count)
+x_test = [np.array(x).flatten() for x in x_test]
+y_test = [np.array(y).flatten() for y in y_test]
 
-        self.bias = np.random.rand(output_count)
-        self.bias_derivatives = np.zeros(output_count)
-
-        self.output = None
-
-        self.next_layer = next_layer
-        accepted_activations = ['relu', 'tanh', 'softmax', 'linear']
-        if not activation in accepted_activations:
-            raise ValueError(f"Unknown activation type {self.activation}. Accepted values are {accepted_activations}")
-        self.activation = activation
-    
-    def feed_forward(self, inputs):
-        # If the number of inputs doesn't match the expected input count
-        if len(inputs) != self.input_count:
-            raise ValueError(f'Expected inputs of size {self.input_count}. Got {len(inputs)}')
-        
-        self.output = np.dot(inputs, self.weights) + self.bias
-
-        if self.activation == 'relu':
-            # Same as np.maximum(output, 0), but much faster
-            self.output[self.output < 0] = 0
-        elif self.activation == 'tanh':
-            self.output = np.tanh(self.output)
-        elif self.activation == 'softmax':
-            exponents = np.exp(self.output)
-            self.output = exponents / np.sum(exponents)
-        elif self.activation == 'linear':
-            pass
-        return self.output
-    
-    def derivative_weighted_input_activation(self):
-        if self.activation == 'relu':
-            return np.array(self.output > 0, dtype=float)
-        if self.activation == 'linear':
-            return self.output
-        # TODO: Add more activation derivatives
-    
-    def error_last_layer(self, example):
-        # Loss derivative
-        if self.loss_type == 'squared error':
-            activation_loss_derivative = (2 * (self.output - example)) * (1 / len(self.output))
-    
-        return activation_loss_derivative * self.derivative_weighted_input_activation()
-    
-    def error_hidden_layer(self, next_layer_errors):
-        weighted_input_error_derivative = np.dot(np.transpose(self.next_layer.weights), next_layer_errors)
-        return weighted_input_error_derivative * self.derivative_weighted_input_activation()
-    
-
-    
-class Network:
-    def __init__(self, *neuron_counts, loss_type='squared error'):
-        self.neuronCounts = neuron_counts
-        accepted_loss_types = ['squared error']
-        if not loss_type in accepted_loss_types:
-            raise
-        self.loss_type = loss_type
-        self.layers = []
-        # The output variable in this class is for the entire network
-        # whereas in the Layer class it's only for a single layer
-        self.output = None
-        # The activation type for each layer is declared in the initalization of the object                   
-        # The zip function makes a list of tuples given two lists, the shorter list being the length of the outputed list
-        # j is just i but +1 index further in neuron counts
-        for i, j in zip(neuron_counts, neuron_counts[1:]): 
-            # If this is the last layer
-            if j == neuron_counts[-1]:
-                activation = 'softmax'
-            else:
-                activation = 'relu'
-            
-            new_layer = Layer(i, j, activation)
-            self.layers.append(new_layer)
-            self.layers[-2].next_layer = new_layer
-    
-    def feed_forward(self, inputs):
-        # If the number of inputs doesn't match the size of the first layer
-        if len(inputs) != self.layers[0].input_count:
-            raise ValueError(f'Expected inputs of size {self.layers[0].input_count}. Got {len(inputs)}')
-        
-        self.output = inputs
-        for i in range(len(self.neuronCounts)):
-            # Feeds the last layers output into the next one's input, and stores the output in the output variable
-            self.output = self.layers[i].feed_forward(self.output)
-        return self.output
-    
-    def loss(self, output, example):
-        if self.loss_type == 'squared error':
-            return np.sum((output - example) ** 2) / len(output)
-    
-    def back_propagate(self, example, learning_rate):
-        pass
-
-
-        
-        
+the_network = Network(28 * 28, 16, 16, 10)
+output = the_network.feed_forward(x_train[0])
+plt.bar(range(len(output)), output)
+output = the_network.feed_forward(x_train[1])
+plt.bar(range(10), output)
+plt.show()
+print(the_network.feed_forward(x_train[0]))
 # Some pseudocode
 """
 x1 = ReLU((input * W1) + b1)
