@@ -158,7 +158,9 @@ y_train = np.eye(10)[y_train]
 x_test = [np.array(x).flatten() for x in x_test]
 y_test = np.eye(10)[y_test]
 
-the_network = Network(28 * 28, 16, 16, 10)
-print(the_network.cross_entropy_loss(the_network.feed_forward(x_train[0]), y_train[0]))
-the_network.back_propagate(x_train[0], y_train[0], 0.1)
-print(the_network.cross_entropy_loss(the_network.feed_forward(x_train[0]), y_train[0]))
+nn = Network(28 * 28, 16, 16, 10)
+loss = nn.cross_entropy_loss(nn.feed_forward(x_train[0]), y_train[0])
+print(f'Loss before: {loss}')
+nn.back_propagate(x_train[0], y_train[0], 0.0001)
+loss = nn.cross_entropy_loss(nn.feed_forward(x_train[0]), y_train[0])
+print(f'Loss after: {loss:.10f}')
