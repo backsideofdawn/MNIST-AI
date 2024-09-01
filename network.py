@@ -1,10 +1,9 @@
 import numpy as np
 
 class Network:
-    def __init__(self, *layer_sizes, regularization=0.0001):
+    def __init__(self, *layer_sizes):
         self.layer_sizes = layer_sizes
         self.layer_count = len(self.layer_sizes)
-        self.regularization = regularization
 
         self.weights = []
         self.weight_gradients = []
@@ -17,10 +16,11 @@ class Network:
         self.errors = []
 
         for i in range(self.layer_count - 1):
+            # Normal distribution
             self.weights.append(np.random.rand(
                 self.layer_sizes[i + 1],
-                self.layer_sizes[i])
-            - 0.5)
+                self.layer_sizes[i]
+            ) * 2 - 1)
             self.weight_gradients.append(np.zeros(self.weights[i].shape))
 
             self.biases.append(np.zeros(self.layer_sizes[i + 1]))
@@ -50,6 +50,8 @@ class Network:
 
     # This is mostly based off of chapter 2 in Neural Network and Deep Learning: http://neuralnetworksanddeeplearning.com/chap2.html
     def back_propagate(self, x, y, learning_rate, weights_grad, biases_grad):
+        # Bias and weight grad are inputs that are passed by reference, not vaue
+        
         self.feed_forward(x)
 
         errors = [np.zeros(layer_size) for layer_size in self.layer_sizes[1:]]
@@ -57,23 +59,20 @@ class Network:
         # You don't need to calculate the softmax derivative, because when combined with the
         # cross entropy loss it the error simplifies
         errors[-1] = self.activations[-1] - y
-        weights_grad[-1] -= learning_rate * (errors[-1].reshape(-1, 1) @ self.activations[-2].reshape(1, -1))
-        biases_grad[-1] -= learning_rate * errors[-1]
 
         # Now for all the other layers
-
         for i in reversed(range(self.layer_count - 2)): # Minus two because the last layer is already figured out
             errors[i] = (self.weights[i + 1].T @ errors[i + 1]) * self.relu_grad(self.activations[i + 1])
-            weights_grad[i] -= learning_rate * (errors[i].reshape(-1, 1) @ self.activations[i].reshape(1, -1))
-            biases_grad[i] -= learning_rate * errors[i].flatten()
         
-        return (weights_grad)
+        for i in reversed(range(self.layer_count - 1)):
+            weights_grad[i] -= learning_rate * errors[i].reshape(-1, 1) @ self.activations[i].reshape(1, -1)
+            biases_grad[i] -= learning_rate * errors[i]
+        
 
     def batch_train(self, x_batch, y_batch, learning_rate=0.01):
         
         weights_grad = [np.zeros(layer.shape) for layer in self.weights]
         biases_grad = [np.zeros(layer.shape) for layer in self.biases]
-    
         
         # Update the gradients for each example
         for x, y in zip(x_batch, y_batch):
@@ -88,7 +87,7 @@ class Network:
     def batch_loss(self, x_batch, y_batch):
         loss = 0
         for x, y in zip(x_batch, y_batch):
-            output = nn.feed_forward(x)
+            output = self.feed_forward(x)
             loss += self.loss(output, y)
         loss /= len(x_batch)
         return loss
@@ -98,10 +97,7 @@ class Network:
         x = np.clip(x, epsilon, 1.0 - epsilon)
         # Calculate cross entropy
         cross_entropy = -np.sum(y * np.log(x))
-        # Add regularization
-        # The equation sums each layer seperately, then sums them together
-        reg = np.sum([np.sum(np.square(layer)) for layer in self.weights])
-        return cross_entropy + (self.regularization * reg)
+        return cross_entropy
 
     def softmax(self, z):
         exponents = np.exp(z - np.max(z))
